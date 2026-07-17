@@ -4,7 +4,7 @@ const PORT = 3000;
 const employeeRoutes = require("./routes/employeeRoutes");
 app.use(express.json());
 app.get("/", (req, res) => {
-    res.send("Welcome to Employee Backend API");
+    res.send("Welcome to Employee Backend API  | Akhila");
 });
 app.use("/api", employeeRoutes);
 app.listen(PORT, () => {
