@@ -29,14 +29,45 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Generate Image Tag
+        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Build Docker Image
         run: |
-          docker build -t employee:v1 .
+          docker build \
+            -t ${{ secrets.ECR_REPOSITORY }}:$TAG .
 
       - name: Tag Docker Image
         run: |
-          docker tag employee:v1 621533607727.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:v1
-      
+          docker tag \
+            ${{ secrets.ECR_REPOSITORY }}:$TAG \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:$TAG
+
       - name: Push Docker Image
         run: |
-          docker push 621533607727.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:v1
+          docker push \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:$TAG
+
+      - name: Clone GitOps Repository
+        run: |
+          git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository_owner }}/employee-k8s.git
+
+      - name: Update deployment.yaml
+        run: |
+          sed -i "s|image:.*|image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:$TAG|" employee-k8s/deployment.yaml
+
+      - name: Commit Changes
+        run: |
+          cd employee-k8s
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add deployment.yaml
+
+          git diff --cached --quiet || git commit -m "Update image to $TAG"
+
+      - name: Push Changes
+        run: |
+          cd employee-k8s
+          git push origin main
